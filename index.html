@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel File Processing</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.2/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.3.0/papaparse.min.js"></script>
+</head>
+<body>
+    <h1>Upload Two Excel Files</h1>
+    <p>Select the two Excel files you want to upload:</p>
+
+    <input type="file" id="file1" accept=".xlsx" />
+    <input type="file" id="file2" accept=".xlsx" />
+    <br/><br/>
+    <button onclick="processFiles()">Process Files</button>
+
+    <h3>Download Processed Files:</h3>
+    <div id="download-links"></div>
+
+    <script>
+        let file1Data, file2Data;
+
+        function handleFileUpload(event, callback) {
+            const reader = new FileReader();
+            const file = event.target.files[0];
+
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                callback(jsonData);
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        document.getElementById('file1').addEventListener('change', function(event) {
+            handleFileUpload(event, function(data) {
+                file1Data = data;
+                alert("File 1 uploaded successfully.");
+            });
+        });
+
+        document.getElementById('file2').addEventListener('change', function(event) {
+            handleFileUpload(event, function(data) {
+                file2Data = data;
+                alert("File 2 uploaded successfully.");
+            });
+        });
+
+        function processFiles() {
+            if (!file1Data || !file2Data) {
+                alert("Please upload both files.");
+                return;
+            }
+
+            // Convert file1Data and file2Data into structured data
+            let df1 = processExcelData(file1Data);
+            let df2 = processExcelData(file2Data);
+
+            // Clean and join the data (mock-up of what you did in Python)
+            df2 = removeDuplicates(df2, 'Điện thoại');
+            let result = joinData(df1, df2, 'Điện thoại');
+
+            // Apply 'New ghi chú' update logic
+            result = updateGhiChu(result);
+
+            // Split the data into 4 parts and sort by 'Mã'
+            let splitResults = splitAndSort(result, 4, 'Mã');
+
+            // Create download links for each part
+            createDownloadLinks(splitResults);
+        }
+
+        // Helper function to process the raw Excel data
+        function processExcelData(data) {
+            const headers = data[1];
+            const rows = data.slice(2);
+            return rows.map(row => {
+                let obj = {};
+                headers.forEach((header, index) => {
+                    obj[header] = row[index] || '';
+                });
+                return obj;
+            });
+        }
+
+        // Helper function to remove duplicates based on a key
+        function removeDuplicates(data, key) {
+            return data.filter((value, index, self) => {
+                return self.findIndex(item => item[key] === value[key]) === index;
+            });
+        }
+
+        // Helper function to join two datasets based on a key
+        function joinData(data1, data2, key) {
+            return data1.map(row1 => {
+                let row2 = data2.find(row => row[key] === row1[key]);
+                return {
+                    ...row1,
+                    'Nội dung': row2 ? row2['Nội dung'] : ''
+                };
+            });
+        }
+
+        // Update 'New ghi chú' column
+        function updateGhiChu(data) {
+            return data.map(row => {
+                let newGhiChu = row['Nội dung'].trim() === "" || row['Nội dung'].trim() === ".." ? row['Ghi chú'] : row['Nội dung'];
+                return {
+                    ...row,
+                    'New ghi chú': newGhiChu
+                };
+            });
+        }
+
+        // Split and sort the data into parts
+        function splitAndSort(data, parts, sortKey) {
+            const shuffledData = data.sort(() => 0.5 - Math.random());
+            const chunkSize = Math.ceil(shuffledData.length / parts);
+            const chunks = [];
+
+            for (let i = 0; i < parts; i++) {
+                const chunk = shuffledData.slice(i * chunkSize, (i + 1) * chunkSize).sort((a, b) => a[sortKey].localeCompare(b[sortKey]));
+                chunks.push(chunk);
+            }
+
+            return chunks;
+        }
+
+        // Create download links for each part
+        function createDownloadLinks(datasets) {
+            const container = document.getElementById('download-links');
+            container.innerHTML = '';
+            datasets.forEach((data, index) => {
+                const csv = Papa.unparse(data);
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `part_${index + 1}.csv`;
+                link.innerText = `Download Part ${index + 1}`;
+                container.appendChild(link);
+                container.appendChild(document.createElement('br'));
+            });
+        }
+    </script>
+</body>
+</html>
