@@ -1,65 +1,114 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redirect Callback</title>
+    <title>Danh sách sản phẩm</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            text-align: center;
-            margin-top: 50px;
+            margin: 20px;
+            line-height: 1.6;
         }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            background-color: #f9f9f9;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
         }
-        h1 {
-            color: #333;
-        }
-        .info {
-            margin-top: 20px;
-            padding: 10px;
+        table th, table td {
             border: 1px solid #ddd;
-            background: #fff;
-            border-radius: 5px;
+            padding: 8px;
             text-align: left;
-            word-wrap: break-word;
+        }
+        table th {
+            background-color: #f4f4f4;
+        }
+        .product-image {
+            width: 100px;
+            height: auto;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Redirect Callback</h1>
-        <p>Trang này được sử dụng làm Redirect URL cho ứng dụng của bạn.</p>
-        <div class="info" id="output">
-            <strong>Thông tin phản hồi từ Nhanh.vn:</strong>
-            <p id="response">Đang xử lý...</p>
-        </div>
-    </div>
+    <h1>Danh sách sản phẩm</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Mã sản phẩm</th>
+                <th>Tên sản phẩm</th>
+                <th>Giá</th>
+                <th>Tồn kho</th>
+                <th>Hình ảnh</th>
+            </tr>
+        </thead>
+        <tbody id="productTable">
+            <!-- Dữ liệu sản phẩm sẽ được thêm vào đây -->
+        </tbody>
+    </table>
 
     <script>
-        // Lấy query parameters từ URL
-        const urlParams = new URLSearchParams(window.location.search);
+        const API_URL = "https://open.nhanh.vn/api/product/list"; // Đường dẫn API
+        const APP_ID = "74812"; // Thay bằng appId của bạn
+        const ACCESS_TOKEN = "8h57RKmzOdDUmxGDlX31oyzlMXr7xPeeCM9WhxWS3ZiEtR7flZnZ30Q85Vp46mGsWPTUHHU46diyuvaoPt2XOKjVkQq9FtMtqB9YU97E7nCqlXF2hbX4pTIw0K3lbTl4FP2mrr6nlyPuqIJfQXOXLsECvhLySUDpCLE"; // Thay bằng accessToken của bạn
+        const BUSINESS_ID = "154423"; // Thay bằng businessId của bạn
 
-        // Lấy giá trị code (nếu có) từ URL
-        const code = urlParams.get('code');
-        const state = urlParams.get('state');
-        const error = urlParams.get('error');
+        // Hàm gọi API và hiển thị dữ liệu
+        async function fetchAndDisplayProducts() {
+            try {
+                // Gửi yêu cầu đến API
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        version: "2.0",
+                        appId: APP_ID,
+                        accessToken: ACCESS_TOKEN,
+                        businessId: BUSINESS_ID
+                    })
+                });
 
-        // Hiển thị kết quả
-        const responseElement = document.getElementById('response');
-        if (code) {
-            responseElement.innerHTML = `<strong>Mã code:</strong> ${code} <br><strong>Trạng thái:</strong> ${state || 'Không có'}`;
-        } else if (error) {
-            responseElement.innerHTML = `<strong>Lỗi:</strong> ${error}`;
-        } else {
-            responseElement.innerHTML = "Không có thông tin nào trong URL.";
+                // Kiểm tra xem API trả về thành công không
+                if (!response.ok) {
+                    throw new Error("Không thể lấy dữ liệu từ API");
+                }
+
+                const result = await response.json();
+
+                // Kiểm tra code trả về
+                if (result.code !== 1) {
+                    throw new Error(result.messages || "Lỗi không xác định");
+                }
+
+                // Lấy danh sách sản phẩm
+                const products = Object.values(result.data);
+
+                // Xóa dữ liệu cũ trong bảng
+                const productTable = document.getElementById("productTable");
+                productTable.innerHTML = "";
+
+                // Thêm sản phẩm vào bảng
+                products.forEach(product => {
+                    const row = document.createElement("tr");
+                    row.innerHTML = `
+                        <td>${product.code}</td>
+                        <td>${product.name}</td>
+                        <td>${product.price} VNĐ</td>
+                        <td>${product.inventory.remain}</td>
+                        <td><img class="product-image" src="${product.image}" alt="${product.name}"></td>
+                    `;
+                    productTable.appendChild(row);
+                });
+
+            } catch (error) {
+                console.error("Lỗi khi lấy dữ liệu:", error.message);
+            }
         }
+
+        // Gọi API mỗi 10 giây để cập nhật dữ liệu
+        fetchAndDisplayProducts(); // Gọi ngay khi trang load
+        setInterval(fetchAndDisplayProducts, 10000); // Cập nhật mỗi 10 giây
     </script>
 </body>
 </html>
